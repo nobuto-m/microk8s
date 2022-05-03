@@ -754,6 +754,10 @@ server_cert_check() {
   openssl x509 -in "$SNAP_DATA"/certs/server.crt -outform der | sha256sum | cut -d' ' -f1 | cut -c1-12
 }
 
+live_cluster_agent_cert_check() {
+  openssl s_client -connect 127.0.0.1:25000 </dev/null 2>/dev/null | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | openssl x509 -outform der | sha256sum | cut -d' ' -f1 | cut -c1-12
+}
+
 # check if this file is run with arguments
 if [[ "$0" == "${BASH_SOURCE}" ]] &&
    [[ ! -z "$1" ]]

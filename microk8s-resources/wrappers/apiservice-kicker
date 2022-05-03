@@ -22,6 +22,7 @@ then
 fi
 
 restart_attempt=0
+cluster_agent_restart_attempt=0
 installed_registry_help=0
 nic_name="vxlan.calico"
 # This flag is used so we do not perform the offload check every time.
@@ -56,6 +57,12 @@ do
         exit 1
     fi
 
+    if [ $cluster_agent_restart_attempt -ge 5 ]
+    then
+        echo "Service kicker restarted the cluster agent too quickly. Exiting."
+        exit 1
+    fi
+
     # every 5 seconds
     sleep 5
     if [ -e "${SNAP_DATA}/var/lock/ha-cluster" ] &&
@@ -74,9 +81,6 @@ do
         csr_modified="$(produce_certs)"
         if [[ "$csr_modified" -eq "1" ]];
         then
-            echo "CSR change detected. Restarting the cluster-agent"
-            snapctl restart microk8s.daemon-cluster-agent
-
             echo "CSR change detected. Reconfiguring the kube-apiserver"
             rm -rf .srl
             snapctl stop microk8s.daemon-kubelite
@@ -89,6 +93,18 @@ do
         else
             restart_attempt=0
         fi
+      fi
+    fi
+
+    if snapctl services microk8s.daemon-cluster-agent | grep active >/dev/null
+    then
+      if [ x"$(live_cluster_agent_cert_check)" != x"$(server_cert_check)" ]
+      then
+        echo "Cluster agent server certificate change detected. Restarting the cluster-agent"
+        snapctl restart microk8s.daemon-cluster-agent
+        cluster_agent_restart_attempt=$[$cluster_agent_restart_attempt+1]
+      else
+        cluster_agent_restart_attempt=0
       fi
     fi
 
